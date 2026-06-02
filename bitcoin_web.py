@@ -60,12 +60,12 @@ def send_email_alert(subject, body):
 
 def get_data():
     try:
-        # === Aktueller Preis mit besserer Fehlerbehandlung ===
-        ticker = requests.get(
+        # === Aktueller Preis ===
+        ticker_resp = requests.get(
             "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT", 
-            timeout=20
-        ).json()
-        
+            timeout=25
+        )
+        ticker = ticker_resp.json()
         current_price = float(ticker["lastPrice"])
         change24 = float(ticker.get("priceChangePercent", 0))
 
@@ -88,7 +88,7 @@ def get_data():
         klines = requests.get(
             "https://api.binance.com/api/v3/klines",
             params={"symbol": "BTCUSDT", "interval": "1d", "limit": 400},
-            timeout=20
+            timeout=25
         ).json()
 
         raw_prices = [float(k[4]) for k in klines]
@@ -123,7 +123,7 @@ def get_data():
         return current_price, change24, ema50, ema200, rsi14, rsi_delta, df
 
     except Exception as e:
-        print(f"Verbindungsfehler: {e}")
+        st.error(f"Verbindungsfehler: {str(e)[:100]}...")
         return None, None, None, None, None, None, None
 
 
