@@ -60,13 +60,13 @@ def send_email_alert(subject, body):
 
 def get_data():
     try:
-        # === Aktueller Preis ===
+        # === Aktueller Preis mit besserer Fehlerbehandlung ===
         ticker = requests.get(
             "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT", 
             timeout=20
         ).json()
         
-        current_price = float(ticker.get("lastPrice"))
+        current_price = float(ticker["lastPrice"])
         change24 = float(ticker.get("priceChangePercent", 0))
 
         # Volatility Alert
@@ -123,7 +123,7 @@ def get_data():
         return current_price, change24, ema50, ema200, rsi14, rsi_delta, df
 
     except Exception as e:
-        print(f"Fehler: {e}")
+        print(f"Verbindungsfehler: {e}")
         return None, None, None, None, None, None, None
 
 
