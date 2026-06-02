@@ -60,7 +60,7 @@ def send_email_alert(subject, body):
 
 def get_data():
     try:
-        # Primär CoinGecko (stabiler auf Railway)
+        # CoinGecko API
         cg = requests.get(
             "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
             timeout=15
@@ -68,14 +68,14 @@ def get_data():
         current_price = float(cg["bitcoin"]["usd"])
         change24 = float(cg["bitcoin"].get("usd_24h_change", 0))
 
-        # Historische Daten
+        # Historische Daten (CoinGecko liefert älteste zuerst)
         hist = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
             timeout=20
         ).json()
 
-        raw_prices = [p[1] for p in hist["prices"]]
+        raw_prices = [p[1] for p in hist["prices"]]   # älteste zuerst
 
         def calculate_ema(prices_list, period):
             if len(prices_list) < period:
@@ -86,8 +86,8 @@ def get_data():
                 ema = (p * multiplier) + (ema * (1 - multiplier))
             return round(ema, 2)
 
-        ema50 = calculate_ema(raw_prices[::-1], 50)
-        ema200 = calculate_ema(raw_prices[::-1], 200)
+        ema50 = calculate_ema(raw_prices, 50)
+        ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
         rsi_delta = None
@@ -97,13 +97,13 @@ def get_data():
                 rsi_delta = f"{rsi14 - rsi_yest:+.1f}"
 
         df = pd.DataFrame({"price": raw_prices})
-        df["EMA_50"] = [calculate_ema(raw_prices[:i+1][::-1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df["EMA_200"] = [calculate_ema(raw_prices[:i+1][::-1], 200) if i >= 199 else None for i in range(len(raw_prices))]
+        df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
+        df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
         return current_price, change24, ema50, ema200, rsi14, rsi_delta, df
 
     except Exception as e:
-        st.error(f"Verbindungsfehler: {str(e)[:80]}...")
+        st.error(f"Verbindungsfehler: {str(e)[:100]}...")
         return None, None, None, None, None, None, None
 
 
