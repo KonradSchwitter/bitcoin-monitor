@@ -60,18 +60,10 @@ def send_email_alert(subject, body):
 
 def get_data():
     try:
-        # Versuch 1: Binance
-        try:
-            ticker = requests.get("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT", timeout=15).json()
-            current_price = float(ticker["lastPrice"])
-            change24 = float(ticker.get("priceChangePercent", 0))
-        except:
-            # Fallback: CoinGecko
-            cg = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true", timeout=15).json()
-            current_price = float(cg["bitcoin"]["usd"])
-            change24 = float(cg["bitcoin"].get("usd_24h_change", 0))
+        ticker = requests.get("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT", timeout=15).json()
+        current_price = float(ticker["lastPrice"])
+        change24 = float(ticker.get("priceChangePercent", 0))
 
-        # Volatility Alert
         global price_history
         now = time.time()
         price_history.append((now, current_price))
@@ -86,16 +78,13 @@ def get_data():
                 body = f"{direction}\n\nVeränderung: {change:+.2f}% in ca. {(now - price_history[0][0])/60:.1f} Minuten\nAktueller Preis: ${current_price:,.2f}"
                 send_email_alert(subject, body)
 
-        # Historische Daten (CoinGecko Fallback)
-        try:
-            hist = requests.get(
-                "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-                params={"vs_currency": "usd", "days": "365", "interval": "daily"},
-                timeout=15
-            ).json()
-            raw_prices = [p[1] for p in hist["prices"]]
-        except:
-            raw_prices = [current_price] * 400  # Fallback
+        klines = requests.get(
+            "https://api.binance.com/api/v3/klines",
+            params={"symbol": "BTCUSDT", "interval": "1d", "limit": 400},
+            timeout=20
+        ).json()
+
+        raw_prices = [float(k[4]) for k in klines]
 
         def calculate_ema(prices_list, period):
             if len(prices_list) < period:
@@ -116,14 +105,15 @@ def get_data():
             if rsi_yest is not None:
                 rsi_delta = f"{rsi14 - rsi_yest:+.1f}"
 
+        # DataFrame mit EMAs
         df = pd.DataFrame({"price": raw_prices})
-        df["EMA_50"] = None
-        df["EMA_200"] = None
+        df["EMA_50"] = [calculate_ema(raw_prices[:i+1][::-1], 50) if i >= 49 else None for i in range(len(raw_prices))]
+        df["EMA_200"] = [calculate_ema(raw_prices[:i+1][::-1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
         return current_price, change24, ema50, ema200, rsi14, rsi_delta, df
 
     except Exception as e:
-        st.error(f"Verbindungsfehler: {str(e)[:80]}...")
+        print(f"Fehler: {e}")
         return None, None, None, None, None, None, None
 
 
@@ -134,7 +124,7 @@ while True:
     price, change24, ema50, ema200, rsi14, rsi_delta, df = get_data()
     
     with placeholder.container():
-        if price is not None:
+        if price is not None and df is not None:
             col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 2])
             
             with col1:
