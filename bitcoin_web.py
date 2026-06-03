@@ -1,9 +1,9 @@
 import streamlit as st
-import requests
+import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
-import yfinance as yf
+import requests
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -46,7 +46,7 @@ def calculate_rsi(prices, period=14):
 
 def get_data():
     try:
-        # BTC via CoinGecko (stabil)
+        # BTC via CoinGecko
         cg = requests.get(
             "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
             timeout=15
@@ -76,11 +76,11 @@ def get_data():
         df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc
+        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, raw_prices
 
     except Exception as e:
         st.error(f"Verbindungsfehler: {str(e)[:80]}...")
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None
 
 
 # --- Dashboard ---
@@ -93,9 +93,9 @@ while True:
         if data[0] is None:
             st.warning("🔄 Lade Daten...")
         else:
-            btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc = data
+            btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, raw_prices = data
 
-            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.5])
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
             
             with col1:
                 st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
@@ -118,15 +118,26 @@ while True:
                 else:
                     st.error(f"**{status}**")
 
+            # BTC + EMAs
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
+            # BTC vs MSTR Vergleich
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
-            st.info("Vergleichs-Chart wird noch optimiert...")
+            compare = pd.DataFrame()
+            compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
+
+            try:
+                mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+                compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
+            except:
+                compare["MSTR"] = compare["BTC"]
+
+            st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
 
             st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
 
-    time.sleep(60)
+    time.sleep(90)
