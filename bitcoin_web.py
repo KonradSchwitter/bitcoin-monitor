@@ -51,7 +51,7 @@ def get_data():
         mstr_price = float(mstr_info['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_info['Close'].iloc[-2])) / float(mstr_info['Close'].iloc[-2]) * 100
 
-        # Historische BTC Daten für EMA + RSI + Chart
+        # Historische BTC Daten
         hist = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
@@ -72,7 +72,6 @@ def get_data():
         ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
-        # DataFrame für BTC Chart
         df = pd.DataFrame({"BTC": raw_prices})
         df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
@@ -92,7 +91,6 @@ while True:
     
     with placeholder.container():
         if btc is not None:
-            # Metriken
             col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
             
             with col1:
@@ -121,22 +119,23 @@ while True:
                 else:
                     st.error(f"**{status}**")
 
-            # Charts
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             chart_data = df[["BTC", "EMA_50", "EMA_200"]]
             st.line_chart(chart_data, width='stretch', height=420)
 
+            # === Verbesserter Vergleichs-Chart ===
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
-            # Normierter Vergleich
             compare = pd.DataFrame()
             compare["BTC"] = df["BTC"] / df["BTC"].iloc[0] * 100
-            
+
             try:
-                mstr_hist = yf.download("MSTR", period="1y", interval="1d")['Close']
+                mstr_hist = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
                 compare["MSTR"] = mstr_hist / mstr_hist.iloc[0] * 100
+                st.success("✅ MSTR Daten erfolgreich geladen")
             except:
-                compare["MSTR"] = compare["BTC"]  # Fallback
-            
+                compare["MSTR"] = compare["BTC"]
+                st.warning("MSTR Historie konnte nicht geladen werden")
+
             st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
