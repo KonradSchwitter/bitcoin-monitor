@@ -124,11 +124,11 @@ while True:
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
-            # BTC vs MSTR Vergleich - Stark vereinfacht
+            # BTC vs MSTR Vergleich - Einfach und robust
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
-            
+
             if len(mstr_long) > 0:
                 compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
 
