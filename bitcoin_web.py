@@ -34,7 +34,7 @@ with tab1:
 
         # Historische Daten
         btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False, auto_adjust=True)
-        raw_prices = btc_long['Close'].dropna().tolist()
+        raw_prices = btc_long['Close'].dropna().tolist()   # ← hier war der Fehler
 
         st.caption(f"Historische Datenpunkte BTC: {len(raw_prices)}")
 
