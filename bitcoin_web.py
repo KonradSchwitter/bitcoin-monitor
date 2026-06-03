@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 st.set_page_config(page_title="Konrad's Monitor", page_icon="₿", layout="wide")
 
 st.title("₿ konrads.ai — Bitcoin & MSTR Monitor")
-st.markdown("**BTC Technicals • MSTR • Vergleich**")
+st.markdown("**BTC Technicals • MSTR**")
 
 # --- Grok AI Analysis ---
 grok_analysis = """
@@ -63,14 +63,11 @@ def get_data():
         df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
-        # MSTR lange Historie
-        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
-
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, df_btc, mstr_long
+        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, df_btc
 
     except Exception as e:
         st.error(f"Verbindungsfehler: {str(e)[:80]}...")
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 
 # --- Dashboard ---
@@ -83,9 +80,9 @@ while True:
         if data[0] is None:
             st.warning("🔄 Lade Daten...")
         else:
-            btc, btc_chg, mstr, mstr_chg, ema50, ema200, df_btc, mstr_long = data
+            btc, btc_chg, mstr, mstr_chg, ema50, ema200, df_btc = data
 
-            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.5])
             
             with col1:
                 st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
@@ -111,21 +108,12 @@ while True:
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
-            # BTC vs MSTR Vergleich - Stark vereinfacht
-            st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
-            compare = pd.DataFrame()
-            compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
-
-            if len(mstr_long) > 0:
-                # MSTR auf die Länge von BTC bringen
-                mstr_norm = mstr_long / mstr_long.iloc[0] * 100
-                compare["MSTR"] = mstr_norm.iloc[:len(compare)]  # Gleiche Länge erzwingen
-
-            st.line_chart(compare, width='stretch', height=480)
+            st.subheader("BTC vs MSTR Performance")
+            st.info("Vergleichs-Chart wird später optimiert.")
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
 
             st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
 
-    time.sleep(90)
+    time.sleep(60)
