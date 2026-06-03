@@ -60,9 +60,9 @@ def get_data():
         mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
         mstr_raw = list(mstr_long)
 
+        # EMA Berechnung
         ema50_btc = calculate_ema(btc_raw, 50)
         ema200_btc = calculate_ema(btc_raw, 200)
-
         ema50_mstr = calculate_ema(mstr_raw, 50)
         ema200_mstr = calculate_ema(mstr_raw, 200)
 
