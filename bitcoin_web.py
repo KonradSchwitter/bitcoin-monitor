@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
-import requests
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -37,27 +36,21 @@ def calculate_rsi(prices, period=14):
 
 def get_data():
     try:
-        # BTC via CoinGecko
-        cg = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
-            timeout=15
-        ).json()
-        btc_price = float(cg["bitcoin"]["usd"])
-        btc_change = float(cg["bitcoin"].get("usd_24h_change", 0))
+        # BTC via yfinance
+        btc = yf.Ticker("BTC-USD")
+        btc_hist = btc.history(period="5d")
+        btc_price = float(btc_hist['Close'].iloc[-1])
+        btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
 
-        # MSTR via Yahoo Finance
+        # MSTR via yfinance
         mstr = yf.Ticker("MSTR")
-        mstr_info = mstr.history(period="5d")
-        mstr_price = float(mstr_info['Close'].iloc[-1])
-        mstr_change = (mstr_price - float(mstr_info['Close'].iloc[-2])) / float(mstr_info['Close'].iloc[-2]) * 100
+        mstr_hist5d = mstr.history(period="5d")
+        mstr_price = float(mstr_hist5d['Close'].iloc[-1])
+        mstr_change = (mstr_price - float(mstr_hist5d['Close'].iloc[-2])) / float(mstr_hist5d['Close'].iloc[-2]) * 100
 
-        # Historische BTC Daten für EMA + Chart
-        hist = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-            params={"vs_currency": "usd", "days": "365", "interval": "daily"},
-            timeout=20
-        ).json()
-        raw_prices = [p[1] for p in hist["prices"]]
+        # Historische Daten für EMA + Chart (BTC)
+        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)
+        raw_prices = btc_long['Close'].tolist()
 
         def calculate_ema(prices_list, period):
             if len(prices_list) < period:
@@ -72,18 +65,17 @@ def get_data():
         ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
-        # DataFrame für BTC + EMAs
         df_btc = pd.DataFrame({"BTC": raw_prices})
         df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
-        # MSTR Historie für Vergleich
-        mstr_hist = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+        # MSTR für Vergleichs-Chart
+        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
 
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, mstr_hist
+        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, mstr_long
 
     except Exception as e:
-        st.error(f"Verbindungsfehler: {str(e)[:80]}...")
+        st.error(f"Verbindungsfehler: {str(e)[:100]}...")
         return None, None, None, None, None, None, None, None, None
 
 
@@ -91,7 +83,7 @@ def get_data():
 placeholder = st.empty()
 
 while True:
-    btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, mstr_hist = get_data()
+    btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, mstr_long = get_data()
     
     with placeholder.container():
         if btc is not None:
@@ -117,23 +109,20 @@ while True:
             
             with col5:
                 status = "🟢 Bullish" if btc > ema200 else "🔴 Bearish"
-                st.markdown(f"**Status**")
+                st.markdown("**Status**")
                 if status == "🟢 Bullish":
                     st.success(f"**{status}**")
                 else:
                     st.error(f"**{status}**")
 
-            # === BTC Chart mit EMAs ===
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
-            # === BTC vs MSTR Vergleich ===
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
-            compare = pd.DataFrame(index=df_btc.index)
+            compare = pd.DataFrame()
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
-
-            if len(mstr_hist) > 0:
-                compare["MSTR"] = mstr_hist / mstr_hist.iloc[0] * 100
+            if len(mstr_long) > 0:
+                compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
             else:
                 compare["MSTR"] = compare["BTC"]
 
