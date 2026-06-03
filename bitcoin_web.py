@@ -31,8 +31,8 @@ def calculate_ema(prices, period):
         ema = (p * multiplier) + (ema * (1 - multiplier))
     return round(ema, 2)
 
-# BTC Daten
 try:
+    # BTC Daten
     cg = requests.get(
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
         timeout=15
@@ -54,25 +54,36 @@ try:
     df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
     df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
-    col1, col2, col3 = st.columns(3)
+    # Metriken
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 1.5])
+    
     with col1:
         st.metric("**Bitcoin Preis**", f"${btc_price:,.2f}", f"{btc_change:+.2f}%")
     with col2:
         st.metric("**EMA 50**", f"${ema50:,.2f}" if ema50 else "—")
     with col3:
         st.metric("**EMA 200**", f"${ema200:,.2f}" if ema200 else "—")
+    with col4:
+        status = "🟢 Bullish" if ema200 and btc_price > ema200 else "🔴 Bearish"
+        if status == "🟢 Bullish":
+            st.success(f"**{status}**")
+        else:
+            st.error(f"**{status}**")
 
     st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
     st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    # MSTR nur als einfache Metrik
-    mstr = yf.Ticker("MSTR")
-    mstr_hist = mstr.history(period="5d")
-    mstr_price = float(mstr_hist['Close'].iloc[-1])
-    mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
-    st.metric("**MicroStrategy (MSTR)**", f"${mstr_price:,.2f}", f"{mstr_change:+.2f}%")
+    # MSTR nur als Preis
+    try:
+        mstr = yf.Ticker("MSTR")
+        mstr_hist = mstr.history(period="5d")
+        mstr_price = float(mstr_hist['Close'].iloc[-1])
+        mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
+        st.metric("**MicroStrategy (MSTR)**", f"${mstr_price:,.2f}", f"{mstr_change:+.2f}%")
+    except:
+        pass
 
 except Exception as e:
-    st.error(f"Fehler: {str(e)[:100]}...")
+    st.error(f"Fehler beim Laden: {str(e)[:100]}...")
 
 st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
