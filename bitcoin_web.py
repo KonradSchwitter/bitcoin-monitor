@@ -37,7 +37,7 @@ def calculate_rsi(prices, period=14):
 
 def get_data():
     try:
-        # BTC via CoinGecko (stabil für Preis)
+        # BTC via CoinGecko
         cg = requests.get(
             "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
             timeout=15
@@ -51,7 +51,7 @@ def get_data():
         mstr_price = float(mstr_info['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_info['Close'].iloc[-2])) / float(mstr_info['Close'].iloc[-2]) * 100
 
-        # Historische BTC Daten für EMA + RSI
+        # Historische BTC Daten
         hist = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
@@ -72,7 +72,6 @@ def get_data():
         ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
-        # DataFrame für Chart
         df = pd.DataFrame({"BTC": raw_prices})
         df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
@@ -92,8 +91,7 @@ while True:
     
     with placeholder.container():
         if btc is not None:
-            # Metriken
-            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 2])
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.5])
             
             with col1:
                 st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
@@ -105,26 +103,25 @@ while True:
                 if ema50:
                     diff50 = btc - ema50
                     pct50 = (diff50 / ema50) * 100
-                    st.metric("**BTC EMA 50**", f"${ema50:,.2f}", f"{pct50:+.2f}%")
+                    st.metric("**EMA 50**", f"${ema50:,.2f}", f"{pct50:+.2f}%")
             
             with col4:
                 if ema200:
                     diff200 = btc - ema200
                     pct200 = (diff200 / ema200) * 100
-                    st.metric("**BTC EMA 200**", f"${ema200:,.2f}", f"{pct200:+.2f}%")
+                    st.metric("**EMA 200**", f"${ema200:,.2f}", f"{pct200:+.2f}%")
             
             with col5:
-                if rsi14 is not None:
-                    st.metric("**RSI 14**", f"{rsi14}")
+                status = "🟢 Bullish" if btc > ema200 else "🔴 Bearish"
+                st.markdown(f"**Status**")
+                st.markdown(f"**{status}**")
 
-            # Charts
-            st.subheader("BTC Kurs + EMAs (letzte 12 Monate)")
+            st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             chart_data = df[["BTC", "EMA_50", "EMA_200"]]
-            st.line_chart(chart_data, width='stretch', height=400)
+            st.line_chart(chart_data, width='stretch', height=420)
 
             st.subheader("BTC vs MSTR Performance (normiert auf 100)")
-            # Hier könnte man später echte MSTR Historie einbauen
-            st.line_chart(df[["BTC"]], width='stretch', height=400)
+            st.line_chart(df[["BTC"]], width='stretch', height=400)   # Kann später erweitert werden
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
