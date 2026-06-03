@@ -77,7 +77,7 @@ while True:
         if btc_price is None:
             st.warning("🔄 Lade Daten... (kann beim ersten Mal etwas dauern)")
         else:
-            raw_prices = list(btc_series)   # Korrigiert
+            raw_prices = list(btc_series)
 
             ema50 = calculate_ema(raw_prices, 50)
             ema200 = calculate_ema(raw_prices, 200)
@@ -98,13 +98,20 @@ while True:
             with col4:
                 if ema200:
                     st.metric("**EMA 200**", f"${ema200:,.2f}", f"{(btc_price - ema200)/ema200*100:+.2f}%")
+                else:
+                    st.metric("**EMA 200**", "—", "")
             
             with col5:
-                status = "🟢 Bullish" if btc_price > ema200 else "🔴 Bearish"
+                if ema200:
+                    status = "🟢 Bullish" if btc_price > ema200 else "🔴 Bearish"
+                else:
+                    status = "—"
                 if status == "🟢 Bullish":
                     st.success(f"**{status}**")
-                else:
+                elif status == "🔴 Bearish":
                     st.error(f"**{status}**")
+                else:
+                    st.info("**Warte auf Daten**")
 
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             df_btc = pd.DataFrame({"BTC": raw_prices})
