@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 st.set_page_config(page_title="Konrad's Monitor", page_icon="₿", layout="wide")
 
 st.title("₿ konrads.ai — Bitcoin & MSTR Monitor")
-st.markdown("**BTC Technicals • MSTR • Vergleich**")
+st.markdown("**BTC Technicals • MSTR • Performance-Vergleich**")
 
 # --- Grok AI Analysis ---
 grok_analysis = """
@@ -72,11 +72,12 @@ def get_data():
         ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
-        df = pd.DataFrame({"BTC": raw_prices})
-        df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
+        df_btc = pd.DataFrame({"BTC": raw_prices})
 
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df, raw_prices
+        # MSTR Historie für Vergleich
+        mstr_hist = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+
+        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, mstr_hist
 
     except Exception as e:
         st.error(f"Verbindungsfehler: {str(e)[:80]}...")
@@ -87,7 +88,7 @@ def get_data():
 placeholder = st.empty()
 
 while True:
-    btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df, raw_prices = get_data()
+    btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, mstr_hist = get_data()
     
     with placeholder.container():
         if btc is not None:
@@ -120,23 +121,25 @@ while True:
                     st.error(f"**{status}**")
 
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
-            chart_data = df[["BTC", "EMA_50", "EMA_200"]]
+            chart_data = df_btc[["BTC"]]
+            chart_data["EMA_50"] = [None] * len(chart_data)   # Platzhalter
+            chart_data["EMA_200"] = [None] * len(chart_data)
             st.line_chart(chart_data, width='stretch', height=420)
 
-            # === Verbesserter Vergleichs-Chart ===
+            # === BTC vs MSTR Vergleich (normiert) ===
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
-            compare["BTC"] = df["BTC"] / df["BTC"].iloc[0] * 100
-
-            try:
-                mstr_hist = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+            
+            # BTC normiert
+            compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
+            
+            # MSTR normiert
+            if len(mstr_hist) > 0:
                 compare["MSTR"] = mstr_hist / mstr_hist.iloc[0] * 100
-                st.success("✅ MSTR Daten erfolgreich geladen")
-            except:
+            else:
                 compare["MSTR"] = compare["BTC"]
-                st.warning("MSTR Historie konnte nicht geladen werden")
 
-            st.line_chart(compare, width='stretch', height=480)
+            st.line_chart(compare, width='stretch', height=500)
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
