@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
+import requests
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -14,13 +15,44 @@ st.markdown("**BTC Technicals • MSTR • Vergleich**")
 
 # --- Grok AI Analysis ---
 grok_analysis = """
-**Grok AI Analysis – 03. Juni 2026**
+**🧠 Grok AI Analysis – 03. Juni 2026**
 
 - Bitcoin notiert weiter unter 70k in der Korrektur.
 - Death Cross (EMA50 unter EMA200) bleibt aktiv.
 - MSTR als leveraged BTC-Play zeigt höhere Volatilität.
 - Langfristig: Geduld und schrittweises Nachkaufen (DCA).
 """
+
+@st.cache_data(ttl=300)  # Cache 5 Minuten
+def get_historical_data():
+    btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)
+    mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)
+    return btc_long['Close'], mstr_long['Close']
+
+def get_current_data():
+    try:
+        btc = yf.Ticker("BTC-USD")
+        btc_hist = btc.history(period="5d")
+        btc_price = float(btc_hist['Close'].iloc[-1])
+        btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
+
+        mstr = yf.Ticker("MSTR")
+        mstr_hist = mstr.history(period="5d")
+        mstr_price = float(mstr_hist['Close'].iloc[-1])
+        mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
+
+        return btc_price, btc_change, mstr_price, mstr_change
+    except:
+        return None, None, None, None
+
+def calculate_ema(prices, period):
+    if len(prices) < period:
+        return None
+    multiplier = 2 / (period + 1)
+    ema = sum(prices[:period]) / period
+    for p in prices[period:]:
+        ema = (p * multiplier) + (ema * (1 - multiplier))
+    return round(ema, 2)
 
 def calculate_rsi(prices, period=14):
     if len(prices) < period + 1:
@@ -34,101 +66,57 @@ def calculate_rsi(prices, period=14):
     rsi = 100 - (100 / (1 + rs))
     return round(rsi.iloc[-1], 2) if not pd.isna(rsi.iloc[-1]) else None
 
-def get_data():
-    try:
-        # BTC
-        btc = yf.Ticker("BTC-USD")
-        btc_hist = btc.history(period="5d")
-        btc_price = float(btc_hist['Close'].iloc[-1])
-        btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
-
-        # MSTR
-        mstr = yf.Ticker("MSTR")
-        mstr_hist5d = mstr.history(period="5d")
-        mstr_price = float(mstr_hist5d['Close'].iloc[-1])
-        mstr_change = (mstr_price - float(mstr_hist5d['Close'].iloc[-2])) / float(mstr_hist5d['Close'].iloc[-2]) * 100
-
-        # BTC lange Historie
-        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)
-        raw_prices = btc_long['Close'].tolist()
-
-        def calculate_ema(prices_list, period):
-            if len(prices_list) < period:
-                return None
-            multiplier = 2 / (period + 1)
-            ema = sum(prices_list[:period]) / period
-            for p in prices_list[period:]:
-                ema = (p * multiplier) + (ema * (1 - multiplier))
-            return round(ema, 2)
-
-        ema50 = calculate_ema(raw_prices, 50)
-        ema200 = calculate_ema(raw_prices, 200)
-        rsi14 = calculate_rsi(raw_prices, 14)
-
-        df_btc = pd.DataFrame({"BTC": raw_prices})
-        df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
-
-        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
-
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, mstr_long
-
-    except Exception as e:
-        print(f"Fehler: {e}")
-        return None, None, None, None, None, None, None, None, None
-
 
 # --- Dashboard ---
 placeholder = st.empty()
 
 while True:
-    data = get_data()
+    btc_price, btc_change, mstr_price, mstr_change = get_current_data()
+    btc_long, mstr_long = get_historical_data()
     
     with placeholder.container():
-        if data[0] is None:
-            st.warning("🔄 Lade Daten... Bitte etwas Geduld.")
+        if btc_price is None:
+            st.warning("🔄 Lade Daten... (kann beim ersten Mal etwas dauern)")
         else:
-            btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, mstr_long = data
+            raw_prices = btc_long.tolist()
             
+            ema50 = calculate_ema(raw_prices, 50)
+            ema200 = calculate_ema(raw_prices, 200)
+            rsi14 = calculate_rsi(raw_prices, 14)
+
             col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
             
             with col1:
-                st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
+                st.metric("**Bitcoin (BTC)**", f"${btc_price:,.2f}", f"{btc_change:+.2f}%")
             
             with col2:
-                st.metric("**MicroStrategy (MSTR)**", f"${mstr:,.2f}", f"{mstr_chg:+.2f}%")
+                st.metric("**MicroStrategy (MSTR)**", f"${mstr_price:,.2f}", f"{mstr_change:+.2f}%")
             
             with col3:
-                if ema50 is not None:
-                    diff50 = btc - ema50
-                    pct50 = (diff50 / ema50) * 100
-                    st.metric("**EMA 50**", f"${ema50:,.2f}", f"{pct50:+.2f}%")
+                if ema50:
+                    st.metric("**EMA 50**", f"${ema50:,.2f}", f"{(btc_price - ema50)/ema50*100:+.2f}%")
             
             with col4:
-                if ema200 is not None:
-                    diff200 = btc - ema200
-                    pct200 = (diff200 / ema200) * 100
-                    st.metric("**EMA 200**", f"${ema200:,.2f}", f"{pct200:+.2f}%")
+                if ema200:
+                    st.metric("**EMA 200**", f"${ema200:,.2f}", f"{(btc_price - ema200)/ema200*100:+.2f}%")
             
             with col5:
-                status = "🟢 Bullish" if (ema200 is not None and btc > ema200) else "🔴 Bearish"
-                st.markdown("**Status**")
+                status = "🟢 Bullish" if btc_price > ema200 else "🔴 Bearish"
                 if status == "🟢 Bullish":
                     st.success(f"**{status}**")
                 else:
                     st.error(f"**{status}**")
 
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
+            df_btc = pd.DataFrame({"BTC": raw_prices})
+            df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
+            df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
-            compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
-            if len(mstr_long) > 0:
-                compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
-            else:
-                compare["MSTR"] = compare["BTC"]
-
+            compare["BTC"] = btc_long / btc_long.iloc[0] * 100
+            compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
             st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
@@ -136,4 +124,4 @@ while True:
 
             st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
 
-    time.sleep(60)
+    time.sleep(90)
