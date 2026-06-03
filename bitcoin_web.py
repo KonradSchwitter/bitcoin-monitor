@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 st.set_page_config(page_title="Konrad's Monitor", page_icon="₿", layout="wide")
 
 st.title("₿ konrads.ai — Bitcoin & MSTR Monitor")
-st.markdown("**BTC Technicals • MSTR • Performance-Vergleich**")
+st.markdown("**BTC Technicals • MSTR • Vergleich**")
 
 # --- Grok AI Analysis ---
 grok_analysis = """
@@ -51,7 +51,7 @@ def get_data():
         mstr_price = float(mstr_info['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_info['Close'].iloc[-2])) / float(mstr_info['Close'].iloc[-2]) * 100
 
-        # Historische BTC Daten
+        # Historische BTC Daten für EMA + Chart
         hist = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
@@ -72,7 +72,10 @@ def get_data():
         ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
+        # DataFrame für BTC + EMAs
         df_btc = pd.DataFrame({"BTC": raw_prices})
+        df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
+        df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
         # MSTR Historie für Vergleich
         mstr_hist = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
@@ -120,26 +123,21 @@ while True:
                 else:
                     st.error(f"**{status}**")
 
+            # === BTC Chart mit EMAs ===
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
-            chart_data = df_btc[["BTC"]]
-            chart_data["EMA_50"] = [None] * len(chart_data)   # Platzhalter
-            chart_data["EMA_200"] = [None] * len(chart_data)
-            st.line_chart(chart_data, width='stretch', height=420)
+            st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
-            # === BTC vs MSTR Vergleich (normiert) ===
+            # === BTC vs MSTR Vergleich ===
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
-            compare = pd.DataFrame()
-            
-            # BTC normiert
+            compare = pd.DataFrame(index=df_btc.index)
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
-            
-            # MSTR normiert
+
             if len(mstr_hist) > 0:
                 compare["MSTR"] = mstr_hist / mstr_hist.iloc[0] * 100
             else:
                 compare["MSTR"] = compare["BTC"]
 
-            st.line_chart(compare, width='stretch', height=500)
+            st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
