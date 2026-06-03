@@ -9,12 +9,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 st.set_page_config(page_title="Konrad's Monitor", page_icon="₿", layout="wide")
 
-st.title("₿ konrads.ai — Bitcoin & MSTR Monitor")
+st.title("Konrad's Bitcoin & MSTR Monitor")
 st.markdown("**BTC Technicals • MSTR • Vergleich**")
 
 # --- Grok AI Analysis ---
 grok_analysis = """
-**🧠 Grok AI Analysis – 03. Juni 2026**
+**Grok AI Analysis – 03. Juni 2026**
 
 - Bitcoin notiert weiter unter 70k in der Korrektur.
 - Death Cross (EMA50 unter EMA200) bleibt aktiv.
