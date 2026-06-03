@@ -3,14 +3,13 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
-import requests
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 st.set_page_config(page_title="Konrad's Monitor", page_icon="₿", layout="wide")
 
-st.title("Konrad's Bitcoin & MSTR Monitor")
+st.title("₿ konrads.ai — Bitcoin & MSTR Monitor")
 st.markdown("**BTC Technicals • MSTR • Vergleich**")
 
 # --- Grok AI Analysis ---
@@ -23,7 +22,7 @@ grok_analysis = """
 - Langfristig: Geduld und schrittweises Nachkaufen (DCA).
 """
 
-@st.cache_data(ttl=300)  # Cache 5 Minuten
+@st.cache_data(ttl=300)
 def get_historical_data():
     btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)
     mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)
@@ -72,14 +71,14 @@ placeholder = st.empty()
 
 while True:
     btc_price, btc_change, mstr_price, mstr_change = get_current_data()
-    btc_long, mstr_long = get_historical_data()
+    btc_series, mstr_series = get_historical_data()
     
     with placeholder.container():
         if btc_price is None:
-            st.warning("🔄 Lade Daten... (kann beim ersten Mal etwas dauern)")
+            st.warning("🔄 Lade Daten... (kann beim ersten Mal 10–20 Sekunden dauern)")
         else:
-            raw_prices = btc_long.tolist()
-            
+            raw_prices = btc_series.tolist()
+
             ema50 = calculate_ema(raw_prices, 50)
             ema200 = calculate_ema(raw_prices, 200)
             rsi14 = calculate_rsi(raw_prices, 14)
@@ -115,8 +114,8 @@ while True:
 
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
-            compare["BTC"] = btc_long / btc_long.iloc[0] * 100
-            compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
+            compare["BTC"] = btc_series / btc_series.iloc[0] * 100
+            compare["MSTR"] = mstr_series / mstr_series.iloc[0] * 100
             st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
