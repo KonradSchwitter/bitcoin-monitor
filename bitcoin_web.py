@@ -124,16 +124,14 @@ while True:
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
-            # BTC vs MSTR Vergleich - Vereinfacht
+            # BTC vs MSTR Vergleich - Stark vereinfacht
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
             
             if len(mstr_long) > 0:
-                # MSTR auf gleiche Länge bringen
-                mstr_norm = mstr_long / mstr_long.iloc[0] * 100
-                compare["MSTR"] = mstr_norm.reindex(compare.index, method='nearest')
-            
+                compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
+
             st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
@@ -142,4 +140,3 @@ while True:
             st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
 
     time.sleep(90)
-    
