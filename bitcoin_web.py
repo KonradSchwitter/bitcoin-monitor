@@ -36,13 +36,13 @@ def calculate_ema(prices, period):
 with tab1:
     st.subheader("Bitcoin Monitor")
     try:
+        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)['Close']
+        raw_prices = list(btc_long)
+
         btc = yf.Ticker("BTC-USD")
         btc_hist = btc.history(period="5d")
         btc_price = float(btc_hist['Close'].iloc[-1])
         btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
-
-        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)['Close']
-        raw_prices = list(btc_long)
 
         ema50 = calculate_ema(raw_prices, 50)
         ema200 = calculate_ema(raw_prices, 200)
@@ -61,20 +61,20 @@ with tab1:
 
         st.line_chart(df[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    except Exception as e:
+    except:
         st.error("Fehler beim Laden der Bitcoin-Daten")
 
 # ====================== TAB 2: MSTR ======================
 with tab2:
     st.subheader("MSTR Monitor")
     try:
+        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+        mstr_raw = list(mstr_long)
+
         mstr = yf.Ticker("MSTR")
         mstr_hist = mstr.history(period="5d")
         mstr_price = float(mstr_hist['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
-
-        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
-        mstr_raw = list(mstr_long)
 
         ema50_mstr = calculate_ema(mstr_raw, 50)
         ema200_mstr = calculate_ema(mstr_raw, 200)
@@ -93,7 +93,7 @@ with tab2:
 
         st.line_chart(df_mstr[["MSTR", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    except Exception as e:
+    except:
         st.error("Fehler beim Laden der MSTR-Daten")
 
 st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
