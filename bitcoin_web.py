@@ -13,6 +13,7 @@ st.title("konrads.ai — Live Monitor")
 tab1, tab2 = st.tabs(["Bitcoin Monitor", "MSTR Monitor"])
 
 def calculate_ema(prices, period):
+    prices = [p for p in prices if pd.notna(p)]  # NaN entfernen
     if len(prices) < period:
         return None
     multiplier = 2 / (period + 1)
@@ -25,15 +26,17 @@ def calculate_ema(prices, period):
 with tab1:
     st.subheader("Bitcoin Monitor")
     try:
-        # Aktueller Preis + Change
+        # Aktueller Preis
         btc = yf.Ticker("BTC-USD")
         btc_hist = btc.history(period="5d")
         btc_price = float(btc_hist['Close'].iloc[-1])
         btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
 
-        # Historische Daten für EMA + Chart
-        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)['Close']
-        raw_prices = list(btc_long)
+        # Historische Daten (1 Jahr)
+        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False, auto_adjust=True)
+        raw_prices = btc_long['Close'].dropna().tolist()
+
+        st.caption(f"Historische Datenpunkte: {len(raw_prices)}")
 
         ema50 = calculate_ema(raw_prices, 50)
         ema200 = calculate_ema(raw_prices, 200)
@@ -60,7 +63,7 @@ with tab1:
         st.line_chart(df[["Price", "EMA_50", "EMA_200"]], width='stretch', height=520)
 
     except Exception as e:
-        st.error("Fehler beim Laden der Bitcoin-Daten")
+        st.error(f"Fehler Bitcoin: {str(e)[:80]}")
 
 # ====================== TAB 2: MSTR ======================
 with tab2:
@@ -71,8 +74,10 @@ with tab2:
         mstr_price = float(mstr_hist['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
 
-        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
-        raw_prices = list(mstr_long)
+        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False, auto_adjust=True)
+        raw_prices = mstr_long['Close'].dropna().tolist()
+
+        st.caption(f"Historische Datenpunkte: {len(raw_prices)}")
 
         ema50 = calculate_ema(raw_prices, 50)
         ema200 = calculate_ema(raw_prices, 200)
@@ -87,18 +92,4 @@ with tab2:
         with col2:
             st.metric("**EMA 50**", f"${ema50:,.2f}" if ema50 else "—")
         with col3:
-            st.metric("**EMA 200**", f"${ema200:,.2f}" if ema200 else "—")
-        with col4:
-            status = "🟢 Bullish" if ema200 and mstr_price > ema200 else "🔴 Bearish"
-            if status == "🟢 Bullish":
-                st.success(f"**{status}**")
-            else:
-                st.error(f"**{status}**")
-
-        st.subheader("MSTR Kurs + EMAs - Letzte 12 Monate")
-        st.line_chart(df[["Price", "EMA_50", "EMA_200"]], width='stretch', height=520)
-
-    except Exception as e:
-        st.error("Fehler beim Laden der MSTR-Daten")
-
-st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
+           
