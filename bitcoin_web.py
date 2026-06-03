@@ -13,16 +13,6 @@ st.title("konrads.ai — Live Monitor")
 
 tab1, tab2 = st.tabs(["Bitcoin Monitor", "MSTR Monitor"])
 
-# --- Grok AI Analysis ---
-grok_analysis = """
-**🧠 Grok AI Analysis – 03. Juni 2026**
-
-- Bitcoin notiert weiter unter 70k in der Korrektur.
-- Death Cross (EMA50 unter EMA200) bleibt aktiv.
-- MSTR als leveraged BTC-Play zeigt höhere Volatilität.
-- Langfristig: Geduld und schrittweises Nachkaufen (DCA).
-"""
-
 def calculate_ema(prices, period):
     if len(prices) < period:
         return None
@@ -61,7 +51,7 @@ with tab1:
 
         st.line_chart(df[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    except:
+    except Exception as e:
         st.error("Fehler beim Laden der Bitcoin-Daten")
 
 # ====================== TAB 2: MSTR ======================
@@ -93,7 +83,7 @@ with tab2:
 
         st.line_chart(df_mstr[["MSTR", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    except:
+    except Exception as e:
         st.error("Fehler beim Laden der MSTR-Daten")
 
 st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
