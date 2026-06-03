@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 st.set_page_config(page_title="Konrad's Monitor", page_icon="₿", layout="wide")
 
 st.title("₿ konrads.ai — Bitcoin & MSTR Monitor")
-st.markdown("**BTC Technicals • MSTR**")
+st.markdown("**BTC Technicals • MSTR Technicals**")
 
 # --- Grok AI Analysis ---
 grok_analysis = """
@@ -54,20 +54,31 @@ def get_data():
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
             timeout=20
         ).json()
-        raw_prices = [p[1] for p in hist["prices"]]
+        btc_raw = [p[1] for p in hist["prices"]]
 
-        ema50 = calculate_ema(raw_prices, 50)
-        ema200 = calculate_ema(raw_prices, 200)
+        # Historische MSTR
+        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+        mstr_raw = mstr_long.tolist()
 
-        df_btc = pd.DataFrame({"BTC": raw_prices})
-        df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
+        ema50_btc = calculate_ema(btc_raw, 50)
+        ema200_btc = calculate_ema(btc_raw, 200)
 
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, df_btc
+        ema50_mstr = calculate_ema(mstr_raw, 50)
+        ema200_mstr = calculate_ema(mstr_raw, 200)
+
+        df_btc = pd.DataFrame({"BTC": btc_raw})
+        df_btc["EMA_50"] = [calculate_ema(btc_raw[:i+1], 50) if i >= 49 else None for i in range(len(btc_raw))]
+        df_btc["EMA_200"] = [calculate_ema(btc_raw[:i+1], 200) if i >= 199 else None for i in range(len(btc_raw))]
+
+        df_mstr = pd.DataFrame({"MSTR": mstr_raw})
+        df_mstr["EMA_50"] = [calculate_ema(mstr_raw[:i+1], 50) if i >= 49 else None for i in range(len(mstr_raw))]
+        df_mstr["EMA_200"] = [calculate_ema(mstr_raw[:i+1], 200) if i >= 199 else None for i in range(len(mstr_raw))]
+
+        return btc_price, btc_change, mstr_price, mstr_change, ema50_btc, ema200_btc, ema50_mstr, ema200_mstr, df_btc, df_mstr
 
     except Exception as e:
         st.error(f"Verbindungsfehler: {str(e)[:80]}...")
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None
 
 
 # --- Dashboard ---
@@ -80,40 +91,41 @@ while True:
         if data[0] is None:
             st.warning("🔄 Lade Daten...")
         else:
-            btc, btc_chg, mstr, mstr_chg, ema50, ema200, df_btc = data
+            btc, btc_chg, mstr, mstr_chg, ema50_btc, ema200_btc, ema50_mstr, ema200_mstr, df_btc, df_mstr = data
 
-            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.5])
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 2])
             
             with col1:
                 st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
             
             with col2:
-                st.metric("**MicroStrategy (MSTR)**", f"${mstr:,.2f}", f"{mstr_chg:+.2f}%")
+                if ema50_btc:
+                    st.metric("**BTC EMA 50**", f"${ema50_btc:,.2f}")
             
             with col3:
-                if ema50:
-                    st.metric("**EMA 50**", f"${ema50:,.2f}", f"{(btc - ema50)/ema50*100:+.2f}%")
-            
+                if ema200_btc:
+                    st.metric("**BTC EMA 200**", f"${ema200_btc:,.2f}")
+
             with col4:
-                if ema200:
-                    st.metric("**EMA 200**", f"${ema200:,.2f}", f"{(btc - ema200)/ema200*100:+.2f}%")
+                st.metric("**MicroStrategy (MSTR)**", f"${mstr:,.2f}", f"{mstr_chg:+.2f}%")
             
             with col5:
-                status = "🟢 Bullish" if ema200 and btc > ema200 else "🔴 Bearish"
-                if status == "🟢 Bullish":
-                    st.success(f"**{status}**")
-                else:
-                    st.error(f"**{status}**")
+                if ema50_mstr:
+                    st.metric("**MSTR EMA 50**", f"${ema50_mstr:,.2f}")
+            
+            with col6:
+                if ema200_mstr:
+                    st.metric("**MSTR EMA 200**", f"${ema200_mstr:,.2f}")
 
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
-            st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
+            st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=400)
 
-            st.subheader("BTC vs MSTR Performance")
-            st.info("Vergleichs-Chart wird später optimiert.")
+            st.subheader("MSTR Kurs + EMAs - Letzte 12 Monate")
+            st.line_chart(df_mstr[["MSTR", "EMA_50", "EMA_200"]], width='stretch', height=400)
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
 
             st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
 
-    time.sleep(60)
+    time.sleep(90)
