@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
-import requests
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -32,96 +31,75 @@ def calculate_ema(prices, period):
         ema = (p * multiplier) + (ema * (1 - multiplier))
     return round(ema, 2)
 
-def get_data():
+@st.cache_data(ttl=300)
+def get_historical_data():
+    btc = yf.download("BTC-USD", period="1y", interval="1d", progress=False)['Close']
+    mstr = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+    return btc, mstr
+
+def get_current_data():
     try:
-        # BTC
-        cg = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
-            timeout=15
-        ).json()
-        btc_price = float(cg["bitcoin"]["usd"])
-        btc_change = float(cg["bitcoin"].get("usd_24h_change", 0))
+        btc = yf.Ticker("BTC-USD").history(period="5d")
+        btc_price = float(btc['Close'].iloc[-1])
+        btc_change = (btc_price - float(btc['Close'].iloc[-2])) / float(btc['Close'].iloc[-2]) * 100
 
-        # MSTR
-        mstr = yf.Ticker("MSTR")
-        mstr_hist = mstr.history(period="5d")
-        mstr_price = float(mstr_hist['Close'].iloc[-1])
-        mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
+        mstr = yf.Ticker("MSTR").history(period="5d")
+        mstr_price = float(mstr['Close'].iloc[-1])
+        mstr_change = (mstr_price - float(mstr['Close'].iloc[-2])) / float(mstr['Close'].iloc[-2]) * 100
 
-        # Historische BTC
-        hist = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-            params={"vs_currency": "usd", "days": "365", "interval": "daily"},
-            timeout=20
-        ).json()
-        btc_raw = [p[1] for p in hist["prices"]]
-
-        # Historische MSTR
-        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
-        mstr_raw = mstr_long.tolist()
-
-        ema50_btc = calculate_ema(btc_raw, 50)
-        ema200_btc = calculate_ema(btc_raw, 200)
-
-        ema50_mstr = calculate_ema(mstr_raw, 50)
-        ema200_mstr = calculate_ema(mstr_raw, 200)
-
-        df_btc = pd.DataFrame({"BTC": btc_raw})
-        df_btc["EMA_50"] = [calculate_ema(btc_raw[:i+1], 50) if i >= 49 else None for i in range(len(btc_raw))]
-        df_btc["EMA_200"] = [calculate_ema(btc_raw[:i+1], 200) if i >= 199 else None for i in range(len(btc_raw))]
-
-        df_mstr = pd.DataFrame({"MSTR": mstr_raw})
-        df_mstr["EMA_50"] = [calculate_ema(mstr_raw[:i+1], 50) if i >= 49 else None for i in range(len(mstr_raw))]
-        df_mstr["EMA_200"] = [calculate_ema(mstr_raw[:i+1], 200) if i >= 199 else None for i in range(len(mstr_raw))]
-
-        return btc_price, btc_change, mstr_price, mstr_change, ema50_btc, ema200_btc, ema50_mstr, ema200_mstr, df_btc, df_mstr
-
-    except Exception as e:
-        st.error(f"Verbindungsfehler: {str(e)[:80]}...")
-        return None, None, None, None, None, None, None, None, None, None
+        return btc_price, btc_change, mstr_price, mstr_change
+    except:
+        return None, None, None, None
 
 
 # --- Dashboard ---
 placeholder = st.empty()
 
 while True:
-    data = get_data()
+    btc_price, btc_change, mstr_price, mstr_change = get_current_data()
+    btc_series, mstr_series = get_historical_data()
     
     with placeholder.container():
-        if data[0] is None:
+        if btc_price is None:
             st.warning("🔄 Lade Daten...")
         else:
-            btc, btc_chg, mstr, mstr_chg, ema50_btc, ema200_btc, ema50_mstr, ema200_mstr, df_btc, df_mstr = data
+            raw_btc = list(btc_series)
+            raw_mstr = list(mstr_series)
 
-            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 2])
+            ema50_btc = calculate_ema(raw_btc, 50)
+            ema200_btc = calculate_ema(raw_btc, 200)
+            ema50_mstr = calculate_ema(raw_mstr, 50)
+            ema200_mstr = calculate_ema(raw_mstr, 200)
+
+            # Metriken
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
             
             with col1:
-                st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
-            
+                st.metric("**Bitcoin**", f"${btc_price:,.2f}", f"{btc_change:+.2f}%")
             with col2:
-                if ema50_btc:
-                    st.metric("**BTC EMA 50**", f"${ema50_btc:,.2f}")
-            
+                st.metric("**BTC EMA 50**", f"${ema50_btc:,.2f}" if ema50_btc else "—")
             with col3:
-                if ema200_btc:
-                    st.metric("**BTC EMA 200**", f"${ema200_btc:,.2f}")
+                st.metric("**BTC EMA 200**", f"${ema200_btc:,.2f}" if ema200_btc else "—")
 
             with col4:
-                st.metric("**MicroStrategy (MSTR)**", f"${mstr:,.2f}", f"{mstr_chg:+.2f}%")
-            
+                st.metric("**MSTR**", f"${mstr_price:,.2f}", f"{mstr_change:+.2f}%")
             with col5:
-                if ema50_mstr:
-                    st.metric("**MSTR EMA 50**", f"${ema50_mstr:,.2f}")
-            
+                st.metric("**MSTR EMA 50**", f"${ema50_mstr:,.2f}" if ema50_mstr else "—")
             with col6:
-                if ema200_mstr:
-                    st.metric("**MSTR EMA 200**", f"${ema200_mstr:,.2f}")
+                st.metric("**MSTR EMA 200**", f"${ema200_mstr:,.2f}" if ema200_mstr else "—")
 
-            st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
-            st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=400)
+            # Charts
+            st.subheader("Bitcoin Kurs + EMAs")
+            df_btc = pd.DataFrame({"BTC": raw_btc})
+            df_btc["EMA 50"] = [calculate_ema(raw_btc[:i+1], 50) if i >= 49 else None for i in range(len(raw_btc))]
+            df_btc["EMA 200"] = [calculate_ema(raw_btc[:i+1], 200) if i >= 199 else None for i in range(len(raw_btc))]
+            st.line_chart(df_btc, width='stretch', height=400)
 
-            st.subheader("MSTR Kurs + EMAs - Letzte 12 Monate")
-            st.line_chart(df_mstr[["MSTR", "EMA_50", "EMA_200"]], width='stretch', height=400)
+            st.subheader("MSTR Kurs + EMAs")
+            df_mstr = pd.DataFrame({"MSTR": raw_mstr})
+            df_mstr["EMA 50"] = [calculate_ema(raw_mstr[:i+1], 50) if i >= 49 else None for i in range(len(raw_mstr))]
+            df_mstr["EMA 200"] = [calculate_ema(raw_mstr[:i+1], 200) if i >= 199 else None for i in range(len(raw_mstr))]
+            st.line_chart(df_mstr, width='stretch', height=400)
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
