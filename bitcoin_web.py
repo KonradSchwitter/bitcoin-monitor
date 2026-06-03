@@ -56,17 +56,16 @@ def get_data():
         ).json()
         btc_raw = [p[1] for p in hist["prices"]]
 
-        # Historische MSTR
+        # Historische MSTR (lange Periode)
         mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
         mstr_raw = list(mstr_long)
 
-        # EMA Berechnung
         ema50_btc = calculate_ema(btc_raw, 50)
         ema200_btc = calculate_ema(btc_raw, 200)
+
         ema50_mstr = calculate_ema(mstr_raw, 50)
         ema200_mstr = calculate_ema(mstr_raw, 200)
 
-        # DataFrames
         df_btc = pd.DataFrame({"BTC": btc_raw})
         df_btc["EMA_50"] = [calculate_ema(btc_raw[:i+1], 50) if i >= 49 else None for i in range(len(btc_raw))]
         df_btc["EMA_200"] = [calculate_ema(btc_raw[:i+1], 200) if i >= 199 else None for i in range(len(btc_raw))]
@@ -94,7 +93,6 @@ while True:
         else:
             btc, btc_chg, mstr, mstr_chg, ema50_btc, ema200_btc, ema50_mstr, ema200_mstr, df_btc, df_mstr = data
 
-            # Metriken
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -106,7 +104,6 @@ while True:
             with col4:
                 st.metric("**MSTR EMA 200**", f"${ema200_mstr:,.2f}" if ema200_mstr else "—")
 
-            # Charts
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=400)
 
