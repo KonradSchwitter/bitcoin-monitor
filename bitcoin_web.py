@@ -98,27 +98,23 @@ while True:
             with col4:
                 if ema200:
                     st.metric("**EMA 200**", f"${ema200:,.2f}", f"{(btc_price - ema200)/ema200*100:+.2f}%")
-                else:
-                    st.metric("**EMA 200**", "—", "")
             
             with col5:
-                if ema200:
-                    status = "🟢 Bullish" if btc_price > ema200 else "🔴 Bearish"
-                else:
-                    status = "—"
+                status = "🟢 Bullish" if (ema200 and btc_price > ema200) else "🔴 Bearish"
                 if status == "🟢 Bullish":
                     st.success(f"**{status}**")
-                elif status == "🔴 Bearish":
-                    st.error(f"**{status}**")
                 else:
-                    st.info("**Warte auf Daten**")
+                    st.error(f"**{status}**")
 
+            # BTC + EMAs Chart
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             df_btc = pd.DataFrame({"BTC": raw_prices})
+            df_btc = df_btc.reset_index(drop=True)
             df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
             df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
+            # BTC vs MSTR Vergleich
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
             compare["BTC"] = btc_series / btc_series.iloc[0] * 100
