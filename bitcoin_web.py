@@ -12,7 +12,6 @@ st.set_page_config(page_title="konrads.ai", page_icon="₿", layout="wide")
 
 st.title("konrads.ai — Live Monitor")
 
-# Waagrechte Navigation oben
 tab1, tab2 = st.tabs(["Bitcoin Monitor", "MSTR Monitor"])
 
 # --- Grok AI Analysis ---
@@ -37,7 +36,6 @@ def calculate_ema(prices, period):
 # ====================== TAB 1: BITCOIN ======================
 with tab1:
     st.subheader("Bitcoin Monitor")
-    
     try:
         cg = requests.get(
             "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
@@ -56,9 +54,9 @@ with tab1:
         ema50 = calculate_ema(raw_prices, 50)
         ema200 = calculate_ema(raw_prices, 200)
 
-        df_btc = pd.DataFrame({"BTC": raw_prices})
-        df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
+        df = pd.DataFrame({"BTC": raw_prices})
+        df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
+        df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -68,7 +66,7 @@ with tab1:
         with col3:
             st.metric("**EMA 200**", f"${ema200:,.2f}" if ema200 else "—")
 
-        st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=500)
+        st.line_chart(df[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
     except:
         st.error("Fehler beim Laden der Bitcoin-Daten")
@@ -76,13 +74,13 @@ with tab1:
 # ====================== TAB 2: MSTR ======================
 with tab2:
     st.subheader("MSTR Monitor")
-    
     try:
         mstr = yf.Ticker("MSTR")
         mstr_hist = mstr.history(period="5d")
         mstr_price = float(mstr_hist['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
 
+        # Lange Historie für MSTR
         mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
         mstr_raw = list(mstr_long)
 
@@ -103,7 +101,7 @@ with tab2:
 
         st.line_chart(df_mstr[["MSTR", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    except:
-        st.error("Fehler beim Laden der MSTR-Daten")
+    except Exception as e:
+        st.error(f"Fehler beim Laden der MSTR-Daten: {str(e)[:100]}")
 
 st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
