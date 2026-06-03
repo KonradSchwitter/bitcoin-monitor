@@ -75,9 +75,9 @@ while True:
     
     with placeholder.container():
         if btc_price is None:
-            st.warning("🔄 Lade Daten... (kann beim ersten Mal 10–20 Sekunden dauern)")
+            st.warning("🔄 Lade Daten... (kann beim ersten Mal etwas dauern)")
         else:
-            raw_prices = list(btc_series)   # Korrigiert: list() statt .tolist()
+            raw_prices = list(btc_series)   # Korrigiert
 
             ema50 = calculate_ema(raw_prices, 50)
             ema200 = calculate_ema(raw_prices, 200)
