@@ -25,7 +25,7 @@ grok_analysis = """
 - Bitcoin notiert aktuell unter 70k.
 - Death Cross aktiv.
 - Nächste wichtige Unterstützung bei 65k–68k.
-- Langfristig: Geduld ist gefragt.
+- Langfristig: Geduld ist gefragt - DCA Kaufauftrag machen
 """
 
 price_history = []
