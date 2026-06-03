@@ -51,7 +51,7 @@ def get_data():
         mstr_price = float(mstr_info['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_info['Close'].iloc[-2])) / float(mstr_info['Close'].iloc[-2]) * 100
 
-        # Historische BTC Daten
+        # Historische BTC Daten für EMA + RSI + Chart
         hist = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
@@ -72,26 +72,28 @@ def get_data():
         ema200 = calculate_ema(raw_prices, 200)
         rsi14 = calculate_rsi(raw_prices, 14)
 
+        # DataFrame für BTC Chart
         df = pd.DataFrame({"BTC": raw_prices})
         df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df
+        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df, raw_prices
 
     except Exception as e:
         st.error(f"Verbindungsfehler: {str(e)[:80]}...")
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None
 
 
 # --- Dashboard ---
 placeholder = st.empty()
 
 while True:
-    btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df = get_data()
+    btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df, raw_prices = get_data()
     
     with placeholder.container():
         if btc is not None:
-            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.5])
+            # Metriken
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
             
             with col1:
                 st.metric("**Bitcoin (BTC)**", f"${btc:,.2f}", f"{btc_chg:+.2f}%")
@@ -114,14 +116,28 @@ while True:
             with col5:
                 status = "🟢 Bullish" if btc > ema200 else "🔴 Bearish"
                 st.markdown(f"**Status**")
-                st.markdown(f"**{status}**")
+                if status == "🟢 Bullish":
+                    st.success(f"**{status}**")
+                else:
+                    st.error(f"**{status}**")
 
+            # Charts
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             chart_data = df[["BTC", "EMA_50", "EMA_200"]]
             st.line_chart(chart_data, width='stretch', height=420)
 
-            st.subheader("BTC vs MSTR Performance (normiert auf 100)")
-            st.line_chart(df[["BTC"]], width='stretch', height=400)   # Kann später erweitert werden
+            st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
+            # Normierter Vergleich
+            compare = pd.DataFrame()
+            compare["BTC"] = df["BTC"] / df["BTC"].iloc[0] * 100
+            
+            try:
+                mstr_hist = yf.download("MSTR", period="1y", interval="1d")['Close']
+                compare["MSTR"] = mstr_hist / mstr_hist.iloc[0] * 100
+            except:
+                compare["MSTR"] = compare["BTC"]  # Fallback
+            
+            st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
             st.markdown(grok_analysis)
