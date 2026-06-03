@@ -46,7 +46,7 @@ def calculate_rsi(prices, period=14):
 
 def get_data():
     try:
-        # BTC via CoinGecko
+        # BTC
         cg = requests.get(
             "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
             timeout=15
@@ -54,13 +54,13 @@ def get_data():
         btc_price = float(cg["bitcoin"]["usd"])
         btc_change = float(cg["bitcoin"].get("usd_24h_change", 0))
 
-        # MSTR via Yahoo Finance
+        # MSTR
         mstr = yf.Ticker("MSTR")
         mstr_hist = mstr.history(period="5d")
         mstr_price = float(mstr_hist['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
 
-        # Historische BTC Daten
+        # Historische BTC
         hist = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
             params={"vs_currency": "usd", "days": "365", "interval": "daily"},
@@ -124,13 +124,15 @@ while True:
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
-            # BTC vs MSTR Vergleich - Korrigiert
+            # BTC vs MSTR Vergleich - Vereinfacht
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
             
             if len(mstr_long) > 0:
-                compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
+                # MSTR auf gleiche Länge bringen
+                mstr_norm = mstr_long / mstr_long.iloc[0] * 100
+                compare["MSTR"] = mstr_norm.reindex(compare.index, method='nearest')
             
             st.line_chart(compare, width='stretch', height=480)
 
@@ -140,3 +142,4 @@ while True:
             st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
 
     time.sleep(90)
+    
