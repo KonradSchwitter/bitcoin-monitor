@@ -94,13 +94,17 @@ while True:
             with col3:
                 if ema50:
                     st.metric("**EMA 50**", f"${ema50:,.2f}", f"{(btc_price - ema50)/ema50*100:+.2f}%")
+                else:
+                    st.metric("**EMA 50**", "—")
             
             with col4:
                 if ema200:
                     st.metric("**EMA 200**", f"${ema200:,.2f}", f"{(btc_price - ema200)/ema200*100:+.2f}%")
+                else:
+                    st.metric("**EMA 200**", "—")
             
             with col5:
-                status = "🟢 Bullish" if (ema200 and btc_price > ema200) else "🔴 Bearish"
+                status = "🟢 Bullish" if ema200 and btc_price > ema200 else "🔴 Bearish"
                 if status == "🟢 Bullish":
                     st.success(f"**{status}**")
                 else:
@@ -109,7 +113,6 @@ while True:
             # BTC + EMAs Chart
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             df_btc = pd.DataFrame({"BTC": raw_prices})
-            df_btc = df_btc.reset_index(drop=True)
             df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
             df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
