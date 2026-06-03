@@ -1,5 +1,4 @@
 import streamlit as st
-import requests
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
@@ -37,19 +36,13 @@ def calculate_ema(prices, period):
 with tab1:
     st.subheader("Bitcoin Monitor")
     try:
-        cg = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",
-            timeout=15
-        ).json()
-        btc_price = float(cg["bitcoin"]["usd"])
-        btc_change = float(cg["bitcoin"].get("usd_24h_change", 0))
+        btc = yf.Ticker("BTC-USD")
+        btc_hist = btc.history(period="5d")
+        btc_price = float(btc_hist['Close'].iloc[-1])
+        btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
 
-        hist = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-            params={"vs_currency": "usd", "days": "365", "interval": "daily"},
-            timeout=20
-        ).json()
-        raw_prices = [p[1] for p in hist["prices"]]
+        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)['Close']
+        raw_prices = list(btc_long)
 
         ema50 = calculate_ema(raw_prices, 50)
         ema200 = calculate_ema(raw_prices, 200)
@@ -68,7 +61,7 @@ with tab1:
 
         st.line_chart(df[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
-    except:
+    except Exception as e:
         st.error("Fehler beim Laden der Bitcoin-Daten")
 
 # ====================== TAB 2: MSTR ======================
@@ -80,7 +73,6 @@ with tab2:
         mstr_price = float(mstr_hist['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
 
-        # Lange Historie für MSTR
         mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
         mstr_raw = list(mstr_long)
 
@@ -102,6 +94,6 @@ with tab2:
         st.line_chart(df_mstr[["MSTR", "EMA_50", "EMA_200"]], width='stretch', height=500)
 
     except Exception as e:
-        st.error(f"Fehler beim Laden der MSTR-Daten: {str(e)[:100]}")
+        st.error("Fehler beim Laden der MSTR-Daten")
 
 st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
