@@ -53,6 +53,19 @@ def calculate_ema(prices, period):
         ema = (p * multiplier) + (ema * (1 - multiplier))
     return round(ema, 2)
 
+def calculate_rsi(prices, period=14):
+    if len(prices) < period + 1:
+        return None
+    deltas = pd.Series(prices).diff()
+    gain = deltas.where(deltas > 0, 0)
+    loss = -deltas.where(deltas < 0, 0)
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return round(rsi.iloc[-1], 2) if not pd.isna(rsi.iloc[-1]) else None
+
+
 # --- Dashboard ---
 placeholder = st.empty()
 
@@ -62,12 +75,13 @@ while True:
     
     with placeholder.container():
         if btc_price is None:
-            st.warning("🔄 Lade Daten... Bitte etwas Geduld.")
+            st.warning("🔄 Lade Daten... (kann beim ersten Mal etwas dauern)")
         else:
             raw_prices = list(btc_series)
 
             ema50 = calculate_ema(raw_prices, 50)
             ema200 = calculate_ema(raw_prices, 200)
+            rsi14 = calculate_rsi(raw_prices, 14)
 
             col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
             
@@ -96,7 +110,7 @@ while True:
                 else:
                     st.error(f"**{status}**")
 
-            # BTC + EMAs Chart
+            # === BTC + EMAs Chart ===
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             chart_data = pd.DataFrame({
                 "BTC": raw_prices,
@@ -105,7 +119,7 @@ while True:
             })
             st.line_chart(chart_data, width='stretch', height=420)
 
-            # BTC vs MSTR Vergleich
+            # === BTC vs MSTR Vergleich ===
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
             compare["BTC"] = btc_series / btc_series.iloc[0] * 100
