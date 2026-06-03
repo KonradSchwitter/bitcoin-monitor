@@ -117,7 +117,9 @@ while True:
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
 
             if len(mstr_long) > 0:
-                compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
+                # MSTR auf die Länge von BTC bringen
+                mstr_norm = mstr_long / mstr_long.iloc[0] * 100
+                compare["MSTR"] = mstr_norm.iloc[:len(compare)]  # Gleiche Länge erzwingen
 
             st.line_chart(compare, width='stretch', height=480)
 
