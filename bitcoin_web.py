@@ -75,7 +75,7 @@ while True:
     
     with placeholder.container():
         if btc_price is None:
-            st.warning("🔄 Lade Daten... (kann beim ersten Mal 10–20 Sekunden dauern)")
+            st.warning("🔄 Lade Daten... (kann beim ersten Mal etwas dauern)")
         else:
             raw_prices = btc_series.tolist()
 
