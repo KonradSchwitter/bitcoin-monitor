@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import time
+import requests
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -36,21 +37,21 @@ def calculate_rsi(prices, period=14):
 
 def get_data():
     try:
-        # BTC via yfinance
+        # BTC
         btc = yf.Ticker("BTC-USD")
         btc_hist = btc.history(period="5d")
         btc_price = float(btc_hist['Close'].iloc[-1])
         btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
 
-        # MSTR via yfinance
+        # MSTR
         mstr = yf.Ticker("MSTR")
         mstr_hist5d = mstr.history(period="5d")
         mstr_price = float(mstr_hist5d['Close'].iloc[-1])
         mstr_change = (mstr_price - float(mstr_hist5d['Close'].iloc[-2])) / float(mstr_hist5d['Close'].iloc[-2]) * 100
 
-        # Lange Historie für BTC (EMA + Chart)
+        # BTC lange Historie
         btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False)
-        raw_prices = btc_long['Close'].values.tolist()   # Korrigiert
+        raw_prices = btc_long['Close'].tolist()
 
         def calculate_ema(prices_list, period):
             if len(prices_list) < period:
@@ -84,10 +85,10 @@ placeholder = st.empty()
 
 while True:
     data = get_data()
-    if data is None:
+    if data[0] is None:
         time.sleep(30)
         continue
-        
+
     btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, mstr_long = data
     
     with placeholder.container():
@@ -100,13 +101,13 @@ while True:
             st.metric("**MicroStrategy (MSTR)**", f"${mstr:,.2f}", f"{mstr_chg:+.2f}%")
         
         with col3:
-            if ema50:
+            if ema50 is not None:
                 diff50 = btc - ema50
                 pct50 = (diff50 / ema50) * 100
                 st.metric("**EMA 50**", f"${ema50:,.2f}", f"{pct50:+.2f}%")
         
         with col4:
-            if ema200:
+            if ema200 is not None:
                 diff200 = btc - ema200
                 pct200 = (diff200 / ema200) * 100
                 st.metric("**EMA 200**", f"${ema200:,.2f}", f"{pct200:+.2f}%")
