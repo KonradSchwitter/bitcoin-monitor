@@ -76,7 +76,10 @@ def get_data():
         df_btc["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
         df_btc["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
 
-        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, raw_prices
+        # MSTR lange Historie für Vergleich
+        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+
+        return btc_price, btc_change, mstr_price, mstr_change, ema50, ema200, rsi14, df_btc, mstr_long
 
     except Exception as e:
         st.error(f"Verbindungsfehler: {str(e)[:80]}...")
@@ -93,7 +96,7 @@ while True:
         if data[0] is None:
             st.warning("🔄 Lade Daten...")
         else:
-            btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, raw_prices = data
+            btc, btc_chg, mstr, mstr_chg, ema50, ema200, rsi14, df_btc, mstr_long = data
 
             col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1.8])
             
@@ -118,7 +121,6 @@ while True:
                 else:
                     st.error(f"**{status}**")
 
-            # BTC + EMAs
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
             st.line_chart(df_btc[["BTC", "EMA_50", "EMA_200"]], width='stretch', height=420)
 
@@ -126,13 +128,10 @@ while True:
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
             compare = pd.DataFrame()
             compare["BTC"] = df_btc["BTC"] / df_btc["BTC"].iloc[0] * 100
-
-            try:
-                mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False)['Close']
+            if len(mstr_long) > 0:
                 compare["MSTR"] = mstr_long / mstr_long.iloc[0] * 100
-            except:
+            else:
                 compare["MSTR"] = compare["BTC"]
-
             st.line_chart(compare, width='stretch', height=480)
 
             st.subheader("My daily AI Analysis")
