@@ -110,14 +110,14 @@ while True:
                 else:
                     st.error(f"**{status}**")
 
-            # BTC + EMAs Chart
+            # BTC + EMAs Chart - Einfache Version
             st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
-            chart_df = pd.DataFrame({
+            chart_data = pd.DataFrame({
                 "BTC": raw_prices,
                 "EMA 50": [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))],
                 "EMA 200": [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
             })
-            st.line_chart(chart_df, width='stretch', height=420)
+            st.line_chart(chart_data, width='stretch', height=420)
 
             # BTC vs MSTR Vergleich
             st.subheader("BTC vs MSTR Performance (normiert auf 100 seit 1 Jahr)")
