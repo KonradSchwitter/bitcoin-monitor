@@ -1,109 +1,229 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import altair as alt
 from datetime import datetime
-
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
-st.set_page_config(page_title="konrads.ai", page_icon="₿", layout="wide")
+# --------------------------------------------------
+# Streamlit Setup
+# --------------------------------------------------
+st.set_page_config(
+    page_title="konrads.ai",
+    page_icon="₿",
+    layout="wide"
+)
 
 st.title("konrads.ai — Live Monitor")
 
-tab1, tab2 = st.tabs(["Bitcoin Monitor", "MSTR Monitor"])
+tab1, tab2 = st.tabs([
+    "Bitcoin Monitor",
+    "MSTR Monitor"
+])
 
-def calculate_ema(prices, period):
-    prices = [p for p in prices if pd.notna(p)]
-    if len(prices) < period:
-        return None
-    multiplier = 2 / (period + 1)
-    ema = sum(prices[:period]) / period
-    for p in prices[period:]:
-        ema = (p * multiplier) + (ema * (1 - multiplier))
-    return round(ema, 2)
+# --------------------------------------------------
+# Daten laden (Cache 5 Minuten)
+# --------------------------------------------------
+@st.cache_data(ttl=300)
+def load_data(symbol):
+    df = yf.download(
+        symbol,
+        period="3y",
+        interval="1d",
+        auto_adjust=True,
+        progress=False
+    )
 
-# ====================== TAB 1: BITCOIN ======================
+    if df.empty:
+        raise ValueError(f"Keine Daten für {symbol} gefunden.")
+
+    return df
+
+
+# --------------------------------------------------
+# Monitor-Funktion
+# --------------------------------------------------
+def show_monitor(symbol, title):
+
+    try:
+        df = load_data(symbol)
+
+        # --------------------------------------------------
+        # Preise
+        # --------------------------------------------------
+        current_price = float(df["Close"].iloc[-1])
+        previous_price = float(df["Close"].iloc[-2])
+
+        daily_change = (
+            (current_price - previous_price)
+            / previous_price
+        ) * 100
+
+        # --------------------------------------------------
+        # EMA Berechnung
+        # --------------------------------------------------
+        df["EMA_50"] = (
+            df["Close"]
+            .ewm(span=50, adjust=False)
+            .mean()
+        )
+
+        df["EMA_200"] = (
+            df["Close"]
+            .ewm(span=200, adjust=False)
+            .mean()
+        )
+
+        ema50 = float(df["EMA_50"].iloc[-1])
+        ema200 = float(df["EMA_200"].iloc[-1])
+
+        # --------------------------------------------------
+        # Trendstatus
+        # --------------------------------------------------
+        golden_cross = ema50 > ema200
+
+        # --------------------------------------------------
+        # Kennzahlen
+        # --------------------------------------------------
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+
+        with col1:
+            st.metric(
+                f"{title} Preis",
+                f"${current_price:,.2f}",
+                f"{daily_change:+.2f}%"
+            )
+
+        with col2:
+            st.metric(
+                "EMA 50",
+                f"${ema50:,.2f}"
+            )
+
+        with col3:
+            st.metric(
+                "EMA 200",
+                f"${ema200:,.2f}"
+            )
+
+        with col4:
+            if golden_cross:
+                st.success("🟢 Golden Cross")
+            else:
+                st.error("🔴 Death Cross")
+
+        st.divider()
+
+        # --------------------------------------------------
+        # Chart Daten (letzte 12 Monate)
+        # --------------------------------------------------
+        chart_df = df.tail(365).copy()
+
+        chart_df = (
+            chart_df[["Close", "EMA_50", "EMA_200"]]
+            .reset_index()
+            .rename(columns={"Close": "Price"})
+        )
+
+        chart_data = chart_df.melt(
+            id_vars=["Date"],
+            value_vars=["Price", "EMA_50", "EMA_200"],
+            var_name="Linie",
+            value_name="Wert"
+        )
+
+        chart = (
+            alt.Chart(chart_data)
+            .mark_line(strokeWidth=2)
+            .encode(
+                x=alt.X(
+                    "Date:T",
+                    title="Datum"
+                ),
+                y=alt.Y(
+                    "Wert:Q",
+                    title="Preis"
+                ),
+                color=alt.Color(
+                    "Linie:N",
+                    scale=alt.Scale(
+                        domain=[
+                            "Price",
+                            "EMA_50",
+                            "EMA_200"
+                        ],
+                        range=[
+                            "#FFFFFF",  # Preis
+                            "#FFA500",  # EMA50
+                            "#FF4040"   # EMA200
+                        ]
+                    )
+                ),
+                tooltip=[
+                    alt.Tooltip(
+                        "Date:T",
+                        title="Datum"
+                    ),
+                    alt.Tooltip(
+                        "Linie:N",
+                        title="Linie"
+                    ),
+                    alt.Tooltip(
+                        "Wert:Q",
+                        title="Wert",
+                        format=",.2f"
+                    )
+                ]
+            )
+            .interactive()
+        )
+
+        st.subheader(
+            f"{title} Kurs + EMA50 + EMA200 (letzte 12 Monate)"
+        )
+
+        st.altair_chart(
+            chart,
+            use_container_width=True
+        )
+
+        st.caption(
+            f"Historische Datenpunkte: {len(df):,}"
+        )
+
+    except Exception as e:
+        st.error(
+            f"Fehler bei {title}: {str(e)}"
+        )
+
+
+# --------------------------------------------------
+# TAB 1 - BITCOIN
+# --------------------------------------------------
 with tab1:
     st.subheader("Bitcoin Monitor")
-    try:
-        # Aktueller Preis
-        btc = yf.Ticker("BTC-USD")
-        btc_hist = btc.history(period="5d")
-        btc_price = float(btc_hist['Close'].iloc[-1])
-        btc_change = (btc_price - float(btc_hist['Close'].iloc[-2])) / float(btc_hist['Close'].iloc[-2]) * 100
+    show_monitor(
+        "BTC-USD",
+        "Bitcoin"
+    )
 
-        # Historische Daten
-        btc_long = yf.download("BTC-USD", period="1y", interval="1d", progress=False, auto_adjust=True)
-        raw_prices = btc_long['Close'].dropna().tolist()   # ← hier war der Fehler
-
-        st.caption(f"Historische Datenpunkte BTC: {len(raw_prices)}")
-
-        ema50 = calculate_ema(raw_prices, 50)
-        ema200 = calculate_ema(raw_prices, 200)
-
-        df = pd.DataFrame({"Price": raw_prices})
-        df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
-
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1.5])
-        with col1:
-            st.metric("**Bitcoin Preis**", f"${btc_price:,.2f}", f"{btc_change:+.2f}%")
-        with col2:
-            st.metric("**EMA 50**", f"${ema50:,.2f}" if ema50 else "—")
-        with col3:
-            st.metric("**EMA 200**", f"${ema200:,.2f}" if ema200 else "—")
-        with col4:
-            status = "🟢 Bullish" if ema200 and btc_price > ema200 else "🔴 Bearish"
-            if status == "🟢 Bullish":
-                st.success(f"**{status}**")
-            else:
-                st.error(f"**{status}**")
-
-        st.subheader("Bitcoin Kurs + EMAs - Letzte 12 Monate")
-        st.line_chart(df[["Price", "EMA_50", "EMA_200"]], width='stretch', height=520)
-
-    except Exception as e:
-        st.error(f"Fehler Bitcoin: {str(e)[:100]}")
-
-# ====================== TAB 2: MSTR ======================
+# --------------------------------------------------
+# TAB 2 - MSTR
+# --------------------------------------------------
 with tab2:
     st.subheader("MSTR Monitor")
-    try:
-        mstr = yf.Ticker("MSTR")
-        mstr_hist = mstr.history(period="5d")
-        mstr_price = float(mstr_hist['Close'].iloc[-1])
-        mstr_change = (mstr_price - float(mstr_hist['Close'].iloc[-2])) / float(mstr_hist['Close'].iloc[-2]) * 100
+    show_monitor(
+        "MSTR",
+        "MSTR"
+    )
 
-        mstr_long = yf.download("MSTR", period="1y", interval="1d", progress=False, auto_adjust=True)
-        raw_prices = mstr_long['Close'].dropna().tolist()
-
-        st.caption(f"Historische Datenpunkte MSTR: {len(raw_prices)}")
-
-        ema50 = calculate_ema(raw_prices, 50)
-        ema200 = calculate_ema(raw_prices, 200)
-
-        df = pd.DataFrame({"Price": raw_prices})
-        df["EMA_50"] = [calculate_ema(raw_prices[:i+1], 50) if i >= 49 else None for i in range(len(raw_prices))]
-        df["EMA_200"] = [calculate_ema(raw_prices[:i+1], 200) if i >= 199 else None for i in range(len(raw_prices))]
-
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1.5])
-        with col1:
-            st.metric("**MSTR Preis**", f"${mstr_price:,.2f}", f"{mstr_change:+.2f}%")
-        with col2:
-            st.metric("**EMA 50**", f"${ema50:,.2f}" if ema50 else "—")
-        with col3:
-            st.metric("**EMA 200**", f"${ema200:,.2f}" if ema200 else "—")
-        with col4:
-            status = "🟢 Bullish" if ema200 and mstr_price > ema200 else "🔴 Bearish"
-            if status == "🟢 Bullish":
-                st.success(f"**{status}**")
-            else:
-                st.error(f"**{status}**")
-
-        st.subheader("MSTR Kurs + EMAs - Letzte 12 Monate")
-        st.line_chart(df[["Price", "EMA_50", "EMA_200"]], width='stretch', height=520)
-
-    except Exception as e:
-        st.error(f"Fehler MSTR: {str(e)[:100]}")
-
-st.caption(f"Aktualisiert um {datetime.now().strftime('%H:%M:%S')} • konrads.ai")
+# --------------------------------------------------
+# Footer
+# --------------------------------------------------
+st.caption(
+    f"Aktualisiert um "
+    f"{datetime.now().strftime('%H:%M:%S')} "
+    f"• konrads.ai"
+)
